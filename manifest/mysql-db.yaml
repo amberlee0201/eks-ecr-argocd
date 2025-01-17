@@ -1,0 +1,91 @@
+# db-pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: db-pv
+  labels:
+    type: local
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 500Mi
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: db-storage
+  hostPath:
+    path: /mnt/data
+
+---
+
+# db-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 30Mi
+  storageClassName: db-storage
+
+
+---
+
+# db-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+  labels:
+    app: mysql
+spec:
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 3306
+      targetPort: 3306
+      nodePort: 31306
+  selector:
+    app: mysql
+
+---
+
+# db-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql-container
+          image: mysql
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: app12345
+            - name: MYSQL_DATABASE
+              value: app
+            - name: MYSQL_USER
+              value: app
+            - name: MYSQL_PASSWORD
+              value: app12345
+          volumeMounts:
+            - mountPath: /var/lib/mysql
+              name: mysqldata
+      volumes:
+        - name: mysqldata
+          persistentVolumeClaim:
+            claimName: db-pvc

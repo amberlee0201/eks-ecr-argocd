@@ -1,0 +1,93 @@
+name: App With ArgoCD Github Actions
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - 'manifest/**' # 특정 디렉토리 무시
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: add application.properties
+        run: |
+          echo "${{ secrets.APP_YAML }}" >> src/main/resources/application.yaml
+
+      # Configure Gradle for optimal use in GitHub Actions, including caching of downloaded dependencies.
+      # See: https://github.com/gradle/actions/blob/main/setup-gradle/README.md
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
+
+      - name: Build with Gradle Wrapper
+        run: ./gradlew build -x test
+
+          # NOTE: The Gradle Wrapper is the default and recommended way to run Gradle (https://docs.gradle.org/current/userguide/gradle_wrapper.html).
+          # If your project does not have the Gradle Wrapper configured, you can use the following configuration to run Gradle with a specified version.
+          #
+          # - name: Setup Gradle
+          #   uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
+          #   with:
+          #     gradle-version: '8.9'
+          #
+        # - name: Build with Gradle 8.9
+        #   run: gradle build
+
+      - name: Naming jar file
+        run: mv ./build/libs/eks-ecr-argocd-0.0.1-SNAPSHOT.jar ./build/libs/app.jar
+
+      #      - uses: actions/upload-artifact@v4
+      #        with:
+      #          name: app
+      #          path: ./build/libs/*.jar
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Login to Amazon ECR private
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: private
+
+      - name: Build, tag, and push docker image to Amazon ECR Public
+        env:
+          REGISTRY_URI: ${{ secrets.REGISTRY_URI }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin $REGISTRY_URI
+          docker build -t $REGISTRY_URI:$IMAGE_TAG .
+          docker push $REGISTRY_URI:$IMAGE_TAG
+
+  argocd:
+    needs: ci
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: main
+          token: ${{ secrets.TOKEN }}
+
+      - name: Update Image with New SHA
+        run: |
+          sed -i "s%image: ${{ secrets.REGISTRY_URI }}:[a-zA-Z0-9._-]*%image: :${{ secrets.REGISTRY_URI }}:${{ github.sha }}%" ./manifest/spring-boot-server.yaml
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "amber.lee.020100@gmail.com"
+          git config --local user.name "amberlee0201"
+          git add .
+          git commit -m "[CI/CD Automated] Update spring boot image to latest"
+          git push

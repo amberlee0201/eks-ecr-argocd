@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spring-boot-eks
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spring-boot-deploy
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spring-boot-deploy
+    spec:
+      containers:
+        - name: spring-boot-eks
+          image: 977099020724.dkr.ecr.ap-northeast-2.amazonaws.com/eks-second:latest
+
+---
+
+# spring-boot-service-01.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: spring-boot-service
+spec:
+  selector:
+    app.kubernetes.io/name: spring-boot-deploy
+  type: NodePort
+  ports:
+    - protocol: TCP
+      nodePort: 31002
+      port: 8080
+      targetPort: 8080
