@@ -82,7 +82,7 @@ jobs:
 
       - name: Update Image with New SHA
         run: |
-          sed -i "s%image: ${{ secrets.REGISTRY_URI }}:[a-zA-Z0-9._-]*%image: :${{ secrets.REGISTRY_URI }}:${{ github.sha }}%" ./manifest/spring-boot-server.yaml
+          sed -i "s%image: ${{ secrets.REGISTRY_URI }}:[a-zA-Z0-9._-]*%image: ${{ secrets.REGISTRY_URI }}:${{ github.sha }}%" ./manifest/spring-boot-server.yaml
 
       - name: Commit and push changes
         run: |
