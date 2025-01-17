@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: spring-boot-eks
-          image: 977099020724.dkr.ecr.ap-northeast-2.amazonaws.com/eks-second:latest
+          image: :977099020724.dkr.ecr.ap-northeast-2.amazonaws.com/eks-second:b172ed5a07c81935c954591b1e42776cb296006d
 
 ---
 
